@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Punch Clock Admin</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    button { margin: 10px 5px 0 0; padding: 10px 20px; font-size: 16px; }
+    input { margin: 10px 0; padding: 8px; }
+    #adminMessage { margin-top: 10px; color: green; }
+    table {
+      margin-top: 20px;
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 700px;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px;
+      text-align: left;
+    }
+    th { background-color: #eee; }
+  </style>
+</head>
+<body>
+  <h1>Admin Panel</h1>
+  <p>Enter Admin Password:</p>
+  <input type="password" id="adminPassword" placeholder="Password"><br>
+  <button onclick="downloadCSVData()">Download CSV</button>
+  <button onclick="dumpToSheets()">Dump to Google Sheets</button>
+  <button onclick="showData()">View Data</button>
+  <button onclick="clearData()">Clear Data</button>
+  <div id="adminMessage"></div>
+
+  <div id="dataTableContainer"></div>
+
+  <script>
+    const adminPass = "admin123"; // Replace securely in production
+
+    function checkPassword() {
+      return document.getElementById("adminPassword").value === adminPass;
+    }
+
+    function getLocalPunchData() {
+      return JSON.parse(localStorage.getItem("punches") || "{}");
+    }
+
+    function downloadCSVData() {
+      if (!checkPassword()) return alert("Incorrect admin password.");
+
+      const data = getLocalPunchData();
+      fetch("dump.php", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      })
+      .then(res => res.blob())
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "punch_data.csv";
+        link.click();
+      })
+      .catch(() => alert("Download failed."));
+    }
+
+    function dumpToSheets() {
+      if (!checkPassword()) return alert("Incorrect admin password.");
+      const data = getLocalPunchData();
+
+      fetch("dump.php?sheets=1", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      })
+      .then(res => res.text())
+      .then(msg => {
+        document.getElementById("adminMessage").textContent = msg;
+      })
+      .catch(() => {
+        document.getElementById("adminMessage").textContent = "Failed to dump to Sheets.";
+      });
+    }
+
+    function showData() {
+      if (!checkPassword()) return alert("Incorrect admin password.");
+
+      const data = getLocalPunchData();
+      const container = document.getElementById("dataTableContainer");
+      container.innerHTML = "";
+
+      const table = document.createElement("table");
+      const thead = document.createElement("thead");
+      const tbody = document.createElement("tbody");
+
+      thead.innerHTML = "<tr><th>User ID</th><th>Timestamp</th><th>Type</th></tr>";
+
+      Object.entries(data).forEach(([userID, punches]) => {
+        punches.forEach(punch => {
+          const row = document.createElement("tr");
+          row.innerHTML = `<td>${userID}</td><td>${punch.timestamp}</td><td>${punch.type}</td>`;
+          tbody.appendChild(row);
+        });
+      });
+
+      table.appendChild(thead);
+      table.appendChild(tbody);
+      container.appendChild(table);
+    }
+
+    function clearData() {
+      if (!checkPassword()) return alert("Incorrect admin password.");
+
+      localStorage.removeItem("punches");
+      localStorage.setItem("lastClear", new Date().toISOString().slice(0, 10));
+      document.getElementById("adminMessage").textContent = "Punch data cleared.";
+      document.getElementById("dataTableContainer").innerHTML = "";
+    }
+
+    function autoClearIfNewDay() {
+      const today = new Date().toISOString().slice(0, 10);
+      const lastClear = localStorage.getItem("lastClear");
+
+      if (lastClear !== today) {
+        localStorage.removeItem("punches");
+        localStorage.setItem("lastClear", today);
+      }
+    }
+
+    autoClearIfNewDay();
+  </script>
+</body>
+</html>
