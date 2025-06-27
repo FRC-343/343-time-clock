@@ -3,143 +3,112 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta name="title" content="Text QR Code Generator - Stylish Modern QR Tool">
-  <meta name="description" content="Generate QR Code from any text instantly. Stylish, advanced QR Code generator tool with download and copy options.">
-  <title>Text QR Code Generator | Plain Text QR Code Generator</title>
-  <meta name="google-site-verification" content="A0CnVQvH_C72nbNXTleHsanwjnXQ4nj75XrjfMexE9A" />
+  <title>QR Code Generator - Initials + ID</title>
   <style>
-    * {
-      box-sizing: border-box;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
     body {
       background: #121212;
       color: #ffffff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
       margin: 0;
-      padding: 0;
-    }
-    header {
-      background: #1f1f1f;
-      padding: 20px;
-      text-align: center;
-      box-shadow: 0 0 10px #000;
-    }
-    header h1 {
-      font-size: 2em;
-      color: #00ffcc;
-    }
-    .container {
-      max-width: 600px;
-      margin: 40px auto;
-      padding: 20px;
-      background: #1e1e1e;
-      border-radius: 15px;
-      box-shadow: 0 0 20px rgba(0, 255, 204, 0.2);
     }
     textarea {
-      width: 100%;
-      height: 100px;
+      width: 300px;
+      height: 80px;
       border: none;
       border-radius: 10px;
       padding: 15px;
-      font-size: 16px;
-      resize: none;
+      font-size: 18px;
       background: #2a2a2a;
       color: #fff;
       margin-bottom: 20px;
+      resize: none;
+      text-align: center;
+      text-transform: uppercase;
     }
     button {
-      padding: 12px 20px;
+      padding: 10px 20px;
       font-size: 16px;
+      margin: 5px;
       border: none;
       border-radius: 8px;
       background-color: #00ffcc;
       color: #000;
       cursor: pointer;
-      margin-right: 10px;
     }
     button:hover {
       background-color: #00e6b8;
     }
-    .qr-code {
-      text-align: center;
+    #qr-code {
       margin-top: 20px;
+      text-align: center;
     }
     canvas {
       background: #fff;
       padding: 10px;
       border-radius: 10px;
     }
-    footer {
-      text-align: center;
-      color: #aaa;
-      padding: 30px 10px;
-      background-color: #1a1a1a;
-      margin-top: 50px;
-    }
-    .info {
-      margin-top: 30px;
-      background: #222;
-      padding: 20px;
-      border-radius: 10px;
-    }
-    .info h3 {
-      color: #00ffcc;
-      margin-bottom: 10px;
-    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Text QR Code Generator</h1>
-  </header>
-
-  <div class="container">
-    <textarea id="text-input" placeholder="Enter your text here..."></textarea>
+  <textarea id="text-input" placeholder="Enter 3 letters + 3 digits (e.g., FML123)"></textarea>
+  <div>
     <button onclick="generateQRCode()">Generate QR</button>
     <button onclick="downloadQR()">Download</button>
     <button onclick="copyQR()">Copy</button>
-    
-    <div class="qr-code" id="qr-code"></div>
-
-    <div class="info">
-      <h3>About This Tool</h3>
-      <p>This <strong><a href="https://goqrgen.com/generator" target="_blank" style="color:#00ffcc;">Text QR Code Generator</a></strong> allows you to create QR codes for any text message instantly. It supports copy, preview, and download functionalities.</p>
-      
-      <h3>How to Use:</h3>
-      <ul>
-        <li>Enter any text into the textbox.</li>
-        <li>Click on "Generate QR" to see your code.</li>
-        <li>You can copy or download the generated QR easily.</li>
-      </ul>
-    </div>
   </div>
-
-  <footer>
-    &copy; 2025 Text QR Code Generator | goqrgen.com
-  </footer>
+  <div id="qr-code"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
   <script>
     function generateQRCode() {
-      const text = document.getElementById("text-input").value;
+      const input = document.getElementById("text-input");
+      const text = input.value.trim().toUpperCase();
       const qrCodeDiv = document.getElementById("qr-code");
       qrCodeDiv.innerHTML = "";
-      if (!text.trim()) {
-        qrCodeDiv.innerHTML = "<p style='color:red;'>Please enter some text.</p>";
+
+      const pattern = /^[A-Za-z]{3}[0-9]{3}$/;
+
+      if (!text) {
+        qrCodeDiv.innerHTML = "<p style='color:red;'>Please enter your 6-character code.</p>";
         return;
       }
+
+      if (!pattern.test(text)) {
+        qrCodeDiv.innerHTML = "<p style='color:red;'>Input must be 3 letters followed by 3 digits (e.g., FML123).</p>";
+        return;
+      }
+
       QRCode.toCanvas(document.createElement("canvas"), text, { width: 200 }, function (error, canvas) {
         if (error) console.error(error);
         qrCodeDiv.appendChild(canvas);
       });
+
+      // Save uppercased value back in the box
+      input.value = text;
+
+
+      /* Below is the code to download the QR codes, We want to eventually create a master doc of all the QR codes.
+      *  Uncommenting this will make the QR code download when clicking generate 
+      */
+
+      // const canvas = document.querySelector("canvas");
+      // if (!canvas) return alert("Please generate the QR code first.");
+      // const link = document.createElement("a");
+      // link.download = "qr-code.png";
+      // link.href = canvas.toDataURL();
+      // link.click();
     }
 
     function downloadQR() {
       const canvas = document.querySelector("canvas");
       if (!canvas) return alert("Please generate the QR code first.");
       const link = document.createElement("a");
-      link.download = "text-qr.png";
+      link.download = "qr-code.png";
       link.href = canvas.toDataURL();
       link.click();
     }

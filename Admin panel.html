@@ -5,38 +5,68 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Punch Clock Admin</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    button { margin: 10px 5px 0 0; padding: 10px 20px; font-size: 16px; }
-    input { margin: 10px 0; padding: 8px; }
+    
+    body { font-family: Arial, sans-serif; padding: 20px; background: #121212; color: #ffffff;}
+    button { margin: 10px 5px 0 0; padding: 10px 20px; font-size: 16px;  background: rgb(72, 5, 5); color: #ffffff;}
+    input { margin: 10px 0; padding: 8px; background: rgb(72, 5, 5); color: #ffffff;}
     #adminMessage { margin-top: 10px; color: green; }
     table {
       margin-top: 20px;
       border-collapse: collapse;
       width: 100%;
       max-width: 700px;
+      
     }
     th, td {
       border: 1px solid #ccc;
       padding: 8px;
       text-align: left;
+
     }
-    th { background-color: #eee; }
+    th {}
   </style>
 </head>
 <body>
   <h1>Admin Panel</h1>
   <p>Enter Admin Password:</p>
   <input type="password" id="adminPassword" placeholder="Password"><br>
-  <button onclick="downloadCSVData()">Download CSV</button>
-  <button onclick="dumpToSheets()">Dump to Google Sheets</button>
-  <button onclick="showData()">View Data</button>
-  <button onclick="clearData()">Clear Data</button>
-  <div id="adminMessage"></div>
+<button onclick="downloadCSVData()">Download CSV</button>
+<button onclick="dumpToSheets()">Dump to Google Sheets</button>
+<button onclick="showData()">View Data</button>
+<button onclick="clearData()">Clear Data</button>
+<button onclick="countCurrentlyPunchedIn()">Count Punched-In Users</button>
+<div id="adminMessage"></div>
+<div id="punchCountMessage"></div>
+
 
   <div id="dataTableContainer"></div>
 
   <script>
     const adminPass = "admin123"; // Replace securely in production
+    
+    function countCurrentlyPunchedIn() {
+  if (!checkPassword()) return alert("Incorrect admin password.");
+
+  const data = getLocalPunchData();
+  let count = 0;
+  let list = [];
+
+  for (const [userID, punches] of Object.entries(data)) {
+    const last = punches[punches.length - 1];
+    if (last && last.type === "in") {
+      count++;
+      list.push(`${userID} (punched in at ${last.timestamp})`);
+    }
+  }
+
+  if (count === 0) {
+    document.getElementById("punchCountMessage").textContent = "No users are currently punched in.";
+  } else {
+    document.getElementById("punchCountMessage").innerHTML =
+      `<strong>Users currently punched in: ${count}</strong><br>` +
+      list.map(u => `- ${u}`).join("<br>");
+  }
+}
 
     function checkPassword() {
       return document.getElementById("adminPassword").value === adminPass;
@@ -46,25 +76,41 @@
       return JSON.parse(localStorage.getItem("punches") || "{}");
     }
 
-    function downloadCSVData() {
-      if (!checkPassword()) return alert("Incorrect admin password.");
+function downloadCSVData() {
+  if (!checkPassword()) return alert("Incorrect admin password.");
 
-      const data = getLocalPunchData();
-      fetch("dump.php", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      })
-      .then(res => res.blob())
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = "punch_data.csv";
-        link.click();
-      })
-      .catch(() => alert("Download failed."));
+  const data = getLocalPunchData();
+  const now = new Date().toLocaleString();
+
+  // Punch out anyone still punched in
+  for (const [userID, punches] of Object.entries(data)) {
+    const last = punches[punches.length - 1];
+    if (last && last.type === "in") {
+      punches.push({ type: "out", timestamp: now });
     }
+  }
+
+  // Save updated data to localStorage
+  localStorage.setItem("punches", JSON.stringify(data));
+
+  // Build CSV content with desired format
+  let csvContent = "User ID\tType\tTimestamp\n";
+  for (const [userID, punches] of Object.entries(data)) {
+    for (const punch of punches) {
+      csvContent += `${userID}\t${punch.type}\t${punch.timestamp}\n`;
+    }
+  }
+
+  // Create downloadable file
+  const blob = new Blob([csvContent], { type: "text/tab-separated-values" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "punch_data.csv";
+  link.click();
+}
+
+
 
     function dumpToSheets() {
       if (!checkPassword()) return alert("Incorrect admin password.");
@@ -84,50 +130,56 @@
       });
     }
 
-    function showData() {
-      if (!checkPassword()) return alert("Incorrect admin password.");
+   function showData() {
+  if (!checkPassword()) return alert("Incorrect admin password.");
 
-      const data = getLocalPunchData();
-      const container = document.getElementById("dataTableContainer");
-      container.innerHTML = "";
+  const data = getLocalPunchData();
+  const container = document.getElementById("dataTableContainer");
+  container.innerHTML = "";
 
-      const table = document.createElement("table");
-      const thead = document.createElement("thead");
-      const tbody = document.createElement("tbody");
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const tbody = document.createElement("tbody");
 
-      thead.innerHTML = "<tr><th>User ID</th><th>Timestamp</th><th>Type</th></tr>";
+  thead.innerHTML = "<tr><th>User ID</th><th>Timestamp</th><th>Type</th></tr>";
 
-      Object.entries(data).forEach(([userID, punches]) => {
-        punches.forEach(punch => {
-          const row = document.createElement("tr");
-          row.innerHTML = `<td>${userID}</td><td>${punch.timestamp}</td><td>${punch.type}</td>`;
-          tbody.appendChild(row);
-        });
-      });
+  Object.entries(data).forEach(([userID, punches]) => {
+    punches.forEach((punch, index) => {
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${userID}</td><td>${punch.timestamp}</td><td>${punch.type}</td>`;
 
-      table.appendChild(thead);
-      table.appendChild(tbody);
-      container.appendChild(table);
-    }
-
-    function clearData() {
-      if (!checkPassword()) return alert("Incorrect admin password.");
-
-      localStorage.removeItem("punches");
-      localStorage.setItem("lastClear", new Date().toISOString().slice(0, 10));
-      document.getElementById("adminMessage").textContent = "Punch data cleared.";
-      document.getElementById("dataTableContainer").innerHTML = "";
-    }
-
-    function autoClearIfNewDay() {
-      const today = new Date().toISOString().slice(0, 10);
-      const lastClear = localStorage.getItem("lastClear");
-
-      if (lastClear !== today) {
-        localStorage.removeItem("punches");
-        localStorage.setItem("lastClear", today);
+      // Highlight if it's the last punch and type is "in"
+      if (index === punches.length - 1 && punch.type === "in") {
+        row.style.backgroundColor = "#480505 "; // light yellow
+        row.style.fontWeight = "bold";
       }
-    }
+
+      tbody.appendChild(row);
+    });
+  });
+
+  table.appendChild(thead);
+  table.appendChild(tbody);
+  container.appendChild(table);
+}
+
+function clearData() {
+  if (!checkPassword()) return alert("Incorrect admin password.");
+
+  const confirmed = confirm("Are you sure you want to clear all punch data? This cannot be undone.");
+
+  if (!confirmed) {
+    document.getElementById("adminMessage").textContent = "Clear operation canceled.";
+    return;
+  }
+
+  localStorage.removeItem("punches");
+  localStorage.setItem("lastClear", new Date().toISOString().slice(0, 10));
+  document.getElementById("adminMessage").textContent = "Punch data cleared.";
+  document.getElementById("dataTableContainer").innerHTML = "";
+  document.getElementById("punchCountMessage").textContent = "";
+}
+
 
     autoClearIfNewDay();
   </script>
