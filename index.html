@@ -72,14 +72,25 @@
     }
 
     function startScanner() {
+
       qrCodeScanner.start(
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         onScanSuccess
       ).catch(err => {
         document.getElementById("message").textContent = "Failed to start QR scanner.";
-      });
+      }).then(() => {
+  // Wait a moment and mirror the video
+  setTimeout(() => {
+    const video = document.querySelector("#reader video");
+    if (video) {
+      video.style.transform = "scaleX(-1)";
     }
+  }, 0);
+      
+    }
+  );
+  }
 
     window.addEventListener("DOMContentLoaded", () => {
       qrCodeScanner = new Html5Qrcode("reader");
