@@ -51,7 +51,7 @@
       punches[userID].push({ type, timestamp: now });
       localStorage.setItem("punches", JSON.stringify(punches));
 
-      document.getElementById("message").textContent = `Punched ${type.toUpperCase()} at ${now}`;
+      document.getElementById("message").textContent = `Punched ${userID} ${type.toUpperCase()} at ${now}`;
     }
 
     function onScanSuccess(decodedText) {
