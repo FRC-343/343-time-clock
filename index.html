@@ -1,66 +1,83 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Time Clock</title>
-  <style>
-    body { font-family: Arial; padding: 20px; }
-    button { margin: 5px; padding: 10px 20px; font-size: 16px; }
-    table { border-collapse: collapse; margin-top: 20px; width: 100%; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-  </style>
-</head>
-<body>
-  <h1>Time Clock</h1>
-
-  <label>User Initials + Code: 
-    <input id="user" placeholder="ABC123" />
-  </label>
-  <br><br>
-
-  <button onclick="sendAction('IN')">Punch In</button>
-  <button onclick="sendAction('OUT')">Punch Out</button>
-
-  <h2>Logs</h2>
-  <table id="logTable">
-    <thead><tr><th>Timestamp</th><th>User</th><th>Action</th></tr></thead>
-    <tbody></tbody>
-  </table>
-
 <script>
-const API_URL = "https://script.google.com/macros/s/AKfycbxV_gquY53PrNDDLApcB4fbZ_NXpbkaiik33vzrBrr_V969cyhym1f6b7MGxxygN4Tp/exec";  // From Google Apps Script
+  let qrCodeScanner;
+  const API_URL = "PASTE_YOUR_WEBAPP_URL_HERE"; // From Google Apps Script deploy
 
-async function sendAction(action) {
-  const user = document.getElementById("user").value.trim();
-  if (!user) {
-    alert("Enter your initials/code first!");
-    return;
+  async function punchClock() {
+    const userID = document.getElementById("userID").value.toUpperCase();
+    const now = new Date().toLocaleString();
+
+    if (!/^[A-Z]{3}\d{3}$/.test(userID)) {
+      document.getElementById("message").textContent = "Invalid ID format. Use FML###.";
+      return;
+    }
+
+    // Determine punch type by looking at last log from Sheets
+    let type = "in";
+    try {
+      const res = await fetch(API_URL);
+      const data = await res.json();
+
+      const userLogs = data.filter(row => row[1] === userID); // row[1] = User column
+      if (userLogs.length > 0) {
+        const last = userLogs[userLogs.length - 1];
+        type = (last[2] === "in") ? "out" : "in";
+      }
+    } catch (e) {
+      console.error("Error fetching logs:", e);
+    }
+
+    // Send punch to Google Sheets
+    await fetch(API_URL, {
+      method: "POST",
+      body: JSON.stringify({ user: userID, action: type })
+    });
+
+    document.getElementById("message").textContent =
+      `Punched ${userID} ${type.toUpperCase()} at ${now}`;
   }
 
-  await fetch(API_URL, {
-    method: "POST",
-    body: JSON.stringify({user, action})
+  function onScanSuccess(decodedText) {
+    const userID = decodedText.toUpperCase();
+    if (/^[A-Z]{3}\d{3}$/.test(userID)) {
+      document.getElementById("userID").value = userID;
+      punchClock();
+
+      qrCodeScanner.stop().then(() => {
+        setTimeout(() => {
+          startScanner();
+        }, 2000);
+      });
+    } else {
+      document.getElementById("message").textContent = "Invalid ID format in QR code.";
+    }
+  }
+
+  function startScanner() {
+    qrCodeScanner.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      onScanSuccess
+    ).catch(err => {
+      document.getElementById("message").textContent = "Failed to start QR scanner.";
+    }).then(() => {
+      setTimeout(() => {
+        const video = document.querySelector("#reader video");
+        if (video) video.style.transform = "scaleX(-1)";
+      }, 0);
+    });
+  }
+
+  window.addEventListener("DOMContentLoaded", () => {
+    qrCodeScanner = new Html5Qrcode("reader");
+
+    Html5Qrcode.getCameras().then(devices => {
+      if (devices && devices.length) {
+        startScanner();
+      } else {
+        document.getElementById("message").textContent = "No camera devices found.";
+      }
+    }).catch(() => {
+      document.getElementById("message").textContent = "Camera access failed.";
+    });
   });
-  loadLogs();
-}
-
-async function loadLogs() {
-  const res = await fetch(API_URL);
-  const data = await res.json();
-
-  const tbody = document.querySelector("#logTable tbody");
-  tbody.innerHTML = "";
-
-  // Skip header row
-  data.slice(1).forEach(row => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${row[0]}</td><td>${row[1]}</td><td>${row[2]}</td>`;
-    tbody.appendChild(tr);
-  });
-}
-
-// Load logs when page opens
-loadLogs();
 </script>
-</body>
-</html>
