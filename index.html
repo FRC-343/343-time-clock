@@ -1,83 +1,106 @@
-<script>
-  let qrCodeScanner;
-  const API_URL = "https://script.google.com/macros/s/AKfycbxV_gquY53PrNDDLApcB4fbZ_NXpbkaiik33vzrBrr_V969cyhym1f6b7MGxxygN4Tp/exec"; // From Google Apps Script deploy
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Punch Clock</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #121212; color: #ffffff; }
+    .container { max-width: 600px; margin: auto; }
+    .section { margin-bottom: 20px; }
+    input[type=text] { width: 100%; padding: 8px; margin-top: 5px; background: rgb(72, 5, 5); color: #ffffff;}
+    button { padding: 10px 15px; margin-top: 10px; background: rgb(72, 5, 5); color: #ffffff;}
+    #message { margin-top: 10px; color: lightgreen; }
+    #reader { width: 100%; margin-top: 10px; }
+  </style>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="section">
+      <h2>User Punch Clock</h2>
 
-  async function punchClock() {
-    const userID = document.getElementById("userID").value.toUpperCase();
-    const now = new Date().toLocaleString();
+      <label for="userID">Enter Initials (FML) and 3-digit code:</label>
+      <input type="text" id="userID" maxlength="6" placeholder="e.g., JDS123">
+      <button onclick="punchClock()">Punch</button>
+      <div id="message"></div>
 
-    if (!/^[A-Z]{3}\d{3}$/.test(userID)) {
-      document.getElementById("message").textContent = "Invalid ID format. Use FML###.";
-      return;
-    }
+      <h3>Or Scan QR Code:</h3>
+      <div id="reader"></div>
+    </div>
+  </div>
 
-    // Determine punch type by looking at last log from Sheets
-    let type = "in";
-    try {
-      const res = await fetch(API_URL);
-      const data = await res.json();
+  <script>
+    let qrCodeScanner;
+    const API_URL = "https://script.google.com/macros/s/AKfycbxV_gquY53PrNDDLApcB4fbZ_NXpbkaiik33vzrBrr_V969cyhym1f6b7MGxxygN4Tp/exec"; // Replace this with your Apps Script URL
 
-      const userLogs = data.filter(row => row[1] === userID); // row[1] = User column
-      if (userLogs.length > 0) {
-        const last = userLogs[userLogs.length - 1];
-        type = (last[2] === "in") ? "out" : "in";
+    async function punchClock() {
+      const userID = document.getElementById("userID").value.toUpperCase();
+      const now = new Date().toLocaleString();
+
+      if (!/^[A-Z]{3}\d{3}$/.test(userID)) {
+        document.getElementById("message").textContent = "Invalid ID format. Use FML###.";
+        return;
       }
-    } catch (e) {
-      console.error("Error fetching logs:", e);
+
+      let type = "in";
+      try {
+        const res = await fetch(API_URL);
+        const data = await res.json();
+        const userLogs = data.filter(row => row[1] === userID);
+        if (userLogs.length > 0) {
+          const last = userLogs[userLogs.length - 1];
+          type = (last[2] === "in") ? "out" : "in";
+        }
+      } catch (e) {
+        console.error("Fetch error:", e);
+      }
+
+      try {
+        await fetch(API_URL, {
+          method: "POST",
+          body: JSON.stringify({ user: userID, action: type })
+        });
+        document.getElementById("message").textContent =
+          `Punched ${userID} ${type.toUpperCase()} at ${now}`;
+      } catch (e) {
+        document.getElementById("message").textContent = "Error sending punch.";
+      }
     }
 
-    // Send punch to Google Sheets
-    await fetch(API_URL, {
-      method: "POST",
-      body: JSON.stringify({ user: userID, action: type })
-    });
-
-    document.getElementById("message").textContent =
-      `Punched ${userID} ${type.toUpperCase()} at ${now}`;
-  }
-
-  function onScanSuccess(decodedText) {
-    const userID = decodedText.toUpperCase();
-    if (/^[A-Z]{3}\d{3}$/.test(userID)) {
-      document.getElementById("userID").value = userID;
-      punchClock();
-
-      qrCodeScanner.stop().then(() => {
-        setTimeout(() => {
-          startScanner();
-        }, 2000);
-      });
-    } else {
-      document.getElementById("message").textContent = "Invalid ID format in QR code.";
-    }
-  }
-
-  function startScanner() {
-    qrCodeScanner.start(
-      { facingMode: "environment" },
-      { fps: 10, qrbox: { width: 250, height: 250 } },
-      onScanSuccess
-    ).catch(err => {
-      document.getElementById("message").textContent = "Failed to start QR scanner.";
-    }).then(() => {
-      setTimeout(() => {
-        const video = document.querySelector("#reader video");
-        if (video) video.style.transform = "scaleX(-1)";
-      }, 0);
-    });
-  }
-
-  window.addEventListener("DOMContentLoaded", () => {
-    qrCodeScanner = new Html5Qrcode("reader");
-
-    Html5Qrcode.getCameras().then(devices => {
-      if (devices && devices.length) {
-        startScanner();
+    function onScanSuccess(decodedText) {
+      const userID = decodedText.toUpperCase();
+      if (/^[A-Z]{3}\d{3}$/.test(userID)) {
+        document.getElementById("userID").value = userID;
+        punchClock();
+        qrCodeScanner.stop().then(() => setTimeout(() => startScanner(), 2000));
       } else {
-        document.getElementById("message").textContent = "No camera devices found.";
+        document.getElementById("message").textContent = "Invalid ID format in QR code.";
       }
-    }).catch(() => {
-      document.getElementById("message").textContent = "Camera access failed.";
+    }
+
+    function startScanner() {
+      qrCodeScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        onScanSuccess
+      ).catch(err => {
+        document.getElementById("message").textContent = "Failed to start QR scanner.";
+      });
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      qrCodeScanner = new Html5Qrcode("reader");
+      Html5Qrcode.getCameras().then(devices => {
+        if (devices && devices.length) {
+          startScanner();
+        } else {
+          document.getElementById("message").textContent = "No camera devices found.";
+        }
+      }).catch(() => {
+        document.getElementById("message").textContent = "Camera access failed.";
+      });
     });
-  });
-</script>
+  </script>
+</body>
+</html>
