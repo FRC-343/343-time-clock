@@ -45,7 +45,7 @@
       button.textContent = "Processing...";
 
       const userID = document.getElementById("userID").value.toUpperCase();
-      const now = new Date().toLocaleString();
+      const now = new Time().toLocaleString();
 
       if (!/^[A-Z]{3}\d{3}$/.test(userID)) {
         document.getElementById("message").textContent = "Invalid ID format. Use FML###.";
