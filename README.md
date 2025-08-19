@@ -1,1 +1,1 @@
-Running on a XXAMP server, currently does not update to google sheets, you will have to add your own stuff ;).
+Currently testing Sheets intergration,  will eventually update with code on how to make your own.
