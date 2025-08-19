@@ -22,7 +22,7 @@
 
       <label for="userID">Enter Initials (FML) and 3-digit code:</label>
       <input type="text" id="userID" maxlength="6" placeholder="e.g., JDS123">
-      <button id="punchBtn" onclick="punchClock()">Punch</button>
+      <button onclick="punchClock()">Punch</button>
       <div id="message"></div>
 
       <h3>Or Scan QR Code:</h3>
@@ -32,55 +32,51 @@
 
   <script>
     let qrCodeScanner;
-    const API_URL = localStorage.getItem("API_URL");
+    const API_URL = "https://script.google.com/macros/s/AKfycbxV_gquY53PrNDDLApcB4fbZ_NXpbkaiik33vzrBrr_V969cyhym1f6b7MGxxygN4Tp/exec"; // Replace this with your Apps Script URL, Please do not use ours
 
-    if (!API_URL) {
-      // bounce back if setup not complete
-      window.location.href = "testPlaceholder.html";
+async function punchClock() {
+  const button = document.querySelector("button");
+  button.disabled = true;               // disable button
+  button.textContent = "Processing..."; // show status
+
+  const userID = document.getElementById("userID").value.toUpperCase();
+  const now = new Date().toLocaleString();
+
+  if (!/^[A-Z]{3}\d{3}$/.test(userID)) {
+    document.getElementById("message").textContent = "Invalid ID format. Use FML###.";
+    button.disabled = false;
+    button.textContent = "Punch";
+    return;
+  }
+
+  let type = "in";
+  try {
+    const res = await fetch(API_URL);
+    const data = await res.json();
+    const userLogs = data.filter(row => row[1] === userID);
+    if (userLogs.length > 0) {
+      const last = userLogs[userLogs.length - 1];
+      type = (last[2] === "in") ? "out" : "in";
     }
+  } catch (e) {
+    console.error("Fetch error:", e);
+  }
 
-    async function punchClock() {
-      const button = document.getElementById("punchBtn");
-      button.disabled = true;
-      button.textContent = "Processing...";
+  try {
+    await fetch(API_URL, {
+      method: "POST",
+      body: JSON.stringify({ user: userID, action: type })
+    });
+    document.getElementById("message").textContent =
+      `Punched ${userID} ${type.toUpperCase()} at ${now}`;
+  } catch (e) {
+    document.getElementById("message").textContent = "Error sending punch.";
+  }
 
-      const userID = document.getElementById("userID").value.toUpperCase();
-      const now = new Date().toLocaleString();
+  button.disabled = false;        // re-enable button
+  button.textContent = "Punch";   // reset label
+}
 
-      if (!/^[A-Z]{3}\d{3}$/.test(userID)) {
-        document.getElementById("message").textContent = "Invalid ID format. Use FML###.";
-        button.disabled = false;
-        button.textContent = "Punch";
-        return;
-      }
-
-      let type = "in";
-      try {
-        const res = await fetch(API_URL);
-        const data = await res.json();
-        const userLogs = data.filter(row => row[1] === userID);
-        if (userLogs.length > 0) {
-          const last = userLogs[userLogs.length - 1];
-          type = (last[2] === "in") ? "out" : "in";
-        }
-      } catch (e) {
-        console.error("Fetch error:", e);
-      }
-
-      try {
-        await fetch(API_URL, {
-          method: "POST",
-          body: JSON.stringify({ user: userID, action: type })
-        });
-        document.getElementById("message").textContent =
-          `Punched ${userID} ${type.toUpperCase()} at ${now}`;
-      } catch (e) {
-        document.getElementById("message").textContent = "Error sending punch.";
-      }
-
-      button.disabled = false;
-      button.textContent = "Punch";
-    }
 
     function onScanSuccess(decodedText) {
       const userID = decodedText.toUpperCase();
