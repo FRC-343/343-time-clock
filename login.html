@@ -1,4 +1,3 @@
-Not in use anymore, left as backup.
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,7 +10,7 @@ Not in use anymore, left as backup.
     .section { margin-bottom: 20px; }
     input[type=text] { width: 100%; padding: 8px; margin-top: 5px; background: rgb(72, 5, 5); color: #ffffff;}
     button { padding: 10px 15px; margin-top: 10px; background: rgb(72, 5, 5); color: #ffffff;}
-    #message { margin-top: 10px; color: green; }
+    #message { margin-top: 10px; color: lightgreen; }
     #reader { width: 100%; margin-top: 10px; }
   </style>
   <script src="https://unpkg.com/html5-qrcode"></script>
@@ -23,7 +22,7 @@ Not in use anymore, left as backup.
 
       <label for="userID">Enter Initials (FML) and 3-digit code:</label>
       <input type="text" id="userID" maxlength="6" placeholder="e.g., JDS123">
-      <button onclick="punchClock()">Punch</button>
+      <button id="punchBtn" onclick="punchClock()">Punch</button>
       <div id="message"></div>
 
       <h3>Or Scan QR Code:</h3>
@@ -33,26 +32,54 @@ Not in use anymore, left as backup.
 
   <script>
     let qrCodeScanner;
+    const API_URL = localStorage.getItem("API_URL");
 
-    function punchClock() {
+    if (!API_URL) {
+      // bounce back if setup not complete
+      window.location.href = "index.html";
+    }
+
+    async function punchClock() {
+      const button = document.getElementById("punchBtn");
+      button.disabled = true;
+      button.textContent = "Processing...";
+
       const userID = document.getElementById("userID").value.toUpperCase();
       const now = new Date().toLocaleString();
 
       if (!/^[A-Z]{3}\d{3}$/.test(userID)) {
         document.getElementById("message").textContent = "Invalid ID format. Use FML###.";
+        button.disabled = false;
+        button.textContent = "Punch";
         return;
       }
 
-      const punches = JSON.parse(localStorage.getItem("punches") || "{}");
-      if (!punches[userID]) punches[userID] = [];
+      let type = "in";
+      try {
+        const res = await fetch(API_URL);
+        const data = await res.json();
+        const userLogs = data.filter(row => row[1] === userID);
+        if (userLogs.length > 0) {
+          const last = userLogs[userLogs.length - 1];
+          type = (last[2] === "in") ? "out" : "in";
+        }
+      } catch (e) {
+        console.error("Fetch error:", e);
+      }
 
-      const lastPunch = punches[userID][punches[userID].length - 1];
-      const type = lastPunch && lastPunch.type === "in" ? "out" : "in";
+      try {
+        await fetch(API_URL, {
+          method: "POST",
+          body: JSON.stringify({ user: userID, action: type })
+        });
+        document.getElementById("message").textContent =
+          `Punched ${userID} ${type.toUpperCase()} at ${now}`;
+      } catch (e) {
+        document.getElementById("message").textContent = "Error sending punch.";
+      }
 
-      punches[userID].push({ type, timestamp: now });
-      localStorage.setItem("punches", JSON.stringify(punches));
-
-      document.getElementById("message").textContent = `Punched ${userID} ${type.toUpperCase()} at ${now}`;
+      button.disabled = false;
+      button.textContent = "Punch";
     }
 
     function onScanSuccess(decodedText) {
@@ -60,42 +87,24 @@ Not in use anymore, left as backup.
       if (/^[A-Z]{3}\d{3}$/.test(userID)) {
         document.getElementById("userID").value = userID;
         punchClock();
-
-        qrCodeScanner.stop().then(() => {
-          // Restart scanning after 2 seconds
-          setTimeout(() => {
-            startScanner();
-          }, 2000);
-        });
+        qrCodeScanner.stop().then(() => setTimeout(() => startScanner(), 2000));
       } else {
         document.getElementById("message").textContent = "Invalid ID format in QR code.";
       }
     }
 
     function startScanner() {
-
       qrCodeScanner.start(
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         onScanSuccess
       ).catch(err => {
         document.getElementById("message").textContent = "Failed to start QR scanner.";
-      }).then(() => {
-  // Wait a moment and mirror the video
-  setTimeout(() => {
-    const video = document.querySelector("#reader video");
-    if (video) {
-      video.style.transform = "scaleX(-1)";
+      });
     }
-  }, 0);
-      
-    }
-  );
-  }
 
     window.addEventListener("DOMContentLoaded", () => {
       qrCodeScanner = new Html5Qrcode("reader");
-
       Html5Qrcode.getCameras().then(devices => {
         if (devices && devices.length) {
           startScanner();
