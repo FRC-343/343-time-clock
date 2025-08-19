@@ -1,55 +1,120 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Punch Clock Setup</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Punch Clock</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; background: #121212; color: #fff; }
-    .container { max-width: 500px; margin: auto; }
-    input[type=text] { width: 100%; padding: 10px; margin: 10px 0; background: #222; color: #fff; }
-    button { padding: 10px 15px; background: rgb(72, 5, 5); color: #fff; border: none; }
-    #message { margin-top: 10px; }
+    body { font-family: Arial, sans-serif; padding: 20px; background: #121212; color: #ffffff; }
+    .container { max-width: 600px; margin: auto; }
+    .section { margin-bottom: 20px; }
+    input[type=text] { width: 100%; padding: 8px; margin-top: 5px; background: rgb(72, 5, 5); color: #ffffff;}
+    button { padding: 10px 15px; margin-top: 10px; background: rgb(72, 5, 5); color: #ffffff;}
+    #message { margin-top: 10px; color: lightgreen; }
+    #reader { width: 100%; margin-top: 10px; }
   </style>
+  <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body>
   <div class="container">
-    <h2>Setup Punch Clock</h2>
-    <p>Enter your Google Apps Script Web App URL:</p>
-    <input type="text" id="apiUrl" placeholder="https://script.google.com/macros/s/.../exec">
-    <button onclick="saveUrl()">Save & Connect</button>
-    <div id="message"></div>
+    <div class="section">
+      <h2>User Punch Clock</h2>
+
+      <label for="userID">Enter Initials (FML) and 3-digit code:</label>
+      <input type="text" id="userID" maxlength="6" placeholder="e.g., JDS123">
+      <button id="punchBtn" onclick="punchClock()">Punch</button>
+      <div id="message"></div>
+
+      <h3>Or Scan QR Code:</h3>
+      <div id="reader"></div>
+    </div>
   </div>
 
   <script>
-    async function saveUrl() {
-      const url = document.getElementById("apiUrl").value.trim();
-      const msg = document.getElementById("message");
+    let qrCodeScanner;
+    const API_URL = localStorage.getItem("API_URL");
 
-      if (!url.startsWith("https://script.google.com/")) {
-        msg.textContent = "Invalid URL. Must be a Google Apps Script Web App link.";
-        msg.style.color = "red";
+    if (!API_URL) {
+      // bounce back if setup not complete
+      window.location.href = "testPlaceholder.html";
+    }
+
+    async function punchClock() {
+      const button = document.getElementById("punchBtn");
+      button.disabled = true;
+      button.textContent = "Processing...";
+
+      const userID = document.getElementById("userID").value.toUpperCase();
+      const now = new Date().toLocaleString();
+
+      if (!/^[A-Z]{3}\d{3}$/.test(userID)) {
+        document.getElementById("message").textContent = "Invalid ID format. Use FML###.";
+        button.disabled = false;
+        button.textContent = "Punch";
         return;
       }
 
-      msg.textContent = "Testing connection...";
-      msg.style.color = "yellow";
+      let type = "in";
+      try {
+        const res = await fetch(API_URL);
+        const data = await res.json();
+        const userLogs = data.filter(row => row[1] === userID);
+        if (userLogs.length > 0) {
+          const last = userLogs[userLogs.length - 1];
+          type = (last[2] === "in") ? "out" : "in";
+        }
+      } catch (e) {
+        console.error("Fetch error:", e);
+      }
 
       try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Bad response");
-        await res.json(); // try parsing JSON
-        localStorage.setItem("API_URL", url);
-        msg.textContent = "Connection successful! Redirecting...";
-        msg.style.color = "lightgreen";
-        setTimeout(() => {
-          window.location.href = "login.html";
-        }, 1000);
+        await fetch(API_URL, {
+          method: "POST",
+          body: JSON.stringify({ user: userID, action: type })
+        });
+        document.getElementById("message").textContent =
+          `Punched ${userID} ${type.toUpperCase()} at ${now}`;
       } catch (e) {
-        msg.textContent = "Connection failed. Check URL.";
-        msg.style.color = "red";
+        document.getElementById("message").textContent = "Error sending punch.";
+      }
+
+      button.disabled = false;
+      button.textContent = "Punch";
+    }
+
+    function onScanSuccess(decodedText) {
+      const userID = decodedText.toUpperCase();
+      if (/^[A-Z]{3}\d{3}$/.test(userID)) {
+        document.getElementById("userID").value = userID;
+        punchClock();
+        qrCodeScanner.stop().then(() => setTimeout(() => startScanner(), 2000));
+      } else {
+        document.getElementById("message").textContent = "Invalid ID format in QR code.";
       }
     }
+
+    function startScanner() {
+      qrCodeScanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        onScanSuccess
+      ).catch(err => {
+        document.getElementById("message").textContent = "Failed to start QR scanner.";
+      });
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      qrCodeScanner = new Html5Qrcode("reader");
+      Html5Qrcode.getCameras().then(devices => {
+        if (devices && devices.length) {
+          startScanner();
+        } else {
+          document.getElementById("message").textContent = "No camera devices found.";
+        }
+      }).catch(() => {
+        document.getElementById("message").textContent = "Camera access failed.";
+      });
+    });
   </script>
 </body>
 </html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Punch Clock Setup</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #121212; color: #fff; }
+    .container { max-width: 500px; margin: auto; }
+    input[type=text] { width: 100%; padding: 10px; margin: 10px 0; background: #222; color: #fff; }
+    button { padding: 10px 15px; background: rgb(72, 5, 5); color: #fff; border: none; }
+    #message { margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Setup Punch Clock</h2>
+    <p>Enter your Google Apps Script Web App URL:</p>
+    <input type="text" id="apiUrl" placeholder="https://script.google.com/macros/s/.../exec">
+    <button onclick="saveUrl()">Save & Connect</button>
+    <div id="message"></div>
+  </div>
+
+  <script>
+    async function saveUrl() {
+      const url = document.getElementById("apiUrl").value.trim();
+      const msg = document.getElementById("message");
+
+      if (!url.startsWith("https://script.google.com/")) {
+        msg.textContent = "Invalid URL. Must be a Google Apps Script Web App link.";
+        msg.style.color = "red";
+        return;
+      }
+
+      msg.textContent = "Testing connection...";
+      msg.style.color = "yellow";
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Bad response");
+        await res.json(); // try parsing JSON
+        localStorage.setItem("API_URL", url);
+        msg.textContent = "Connection successful! Redirecting...";
+        msg.style.color = "lightgreen";
+        setTimeout(() => {
+          window.location.href = "login.html";
+        }, 1000);
+      } catch (e) {
+        msg.textContent = "Connection failed. Check URL.";
+        msg.style.color = "red";
+      }
+    }
+  </script>
+</body>
+</html>
