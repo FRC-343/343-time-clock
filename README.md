@@ -1,1 +1,1 @@
-Currently testing Sheets intergration,  will eventually update with code on how to make your own.
+Timeclock/punchcard for our team please feel free to fork for your own.
