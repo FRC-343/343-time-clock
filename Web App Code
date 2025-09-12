@@ -1,0 +1,25 @@
+To create the web app intergration go to your google sheets sheet, click Extensions -> Apps Script. Copy the following code and paste over anything that auto generates in the file. Then click deploy -> settings cog next to select type and click web app, set who has access to eveyone and then click deploy. Follow google popups to confirm access.
+Copy the link it provides(save this somewhere on the same computer you will be using as your log in machine). Paste into the start up page.
+If you need to copy the link afterwards go to the sheet page -> Extentions -> Apps Scrip -> deploy -> manage deployments -> copy the WEB APP link.
+
+
+function doPost(e) {
+var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+var data = JSON.parse(e.postData.contents);
+
+sheet.appendRow([new Date(), data.user, data.action]);
+
+return ContentService
+  .createTextOutput(JSON.stringify({status: "success"}))
+  .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doGet(e) {
+var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+var values = sheet.getDataRange().getValues();
+
+return ContentService
+  .createTextOutput(JSON.stringify(values))
+  .setMimeType(ContentService.MimeType.JSON);
+}
+
